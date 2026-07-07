@@ -16,6 +16,10 @@ After installing the plugin in Codex, start a new thread and ask:
 Use $codex-usage-viewer
 Use $codex-usage-viewer days=30
 ```
+It would show:
+
+<img width="648" height="475" alt="image" src="https://github.com/user-attachments/assets/1383accd-e019-4699-9be3-18ab1742301c" />
+
 
 The bundled script accepts one optional argument:
 
