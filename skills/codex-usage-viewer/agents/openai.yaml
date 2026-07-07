@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Usage Viewer"
-  short_description: "Show local Codex usage as a heatmap"
+  short_description: "Show local Codex usage overview and heatmap"
   default_prompt: "Use $codex-usage-viewer to show my Codex usage activity."

@@ -5,7 +5,7 @@ description: Render a terminal activity heatmap of local Codex token usage from 
 
 # Codex Usage Viewer
 
-Run the bundled script to show a local Codex usage activity graph.
+Run the bundled script to show a local Codex usage overview and activity graph.
 
 ## Workflow
 
@@ -15,14 +15,16 @@ Run the bundled script to show a local Codex usage activity graph.
 2. Run:
 
 ```bash
-python3 <this-skill>/scripts/usagevis.py [days]
+python3 <this-skill>/scripts/usagevis.py --color always [days]
 ```
 
-3. Return the activity graph output directly. Do not add Top Days, Top Working Directories, CSV, JSON, or HTML reports.
+3. Return the overview and activity graph output directly as raw terminal output. Do not wrap it in a Markdown code block, and do not add bars, Top Days, Top Working Directories, CSV, JSON, or HTML reports.
 
 ## Notes
 
 - The script reads only local `token_count` events from `~/.codex/sessions`.
 - Dates are grouped by each `token_count` event timestamp in `Asia/Shanghai`.
+- The overview shows estimated cost, input, output, and cached input using the bundled default price profile.
+- `--color always` is used so Codex plugin output can preserve ANSI color even when `NO_COLOR` is set in the execution environment.
 - Message content is not exported or displayed.
 - `/usagevis` is treated as a trigger phrase for this skill. If the active Codex client intercepts unknown slash commands before they reach the model, use `usagevis` or `Use $codex-usage-viewer` instead.

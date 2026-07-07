@@ -31,6 +31,14 @@ GLYPHS_WIDE = ("··", "░░", "▒▒", "▓▓", "██")
 GLYPHS_NARROW = ("·", "░", "▒", "▓", "█")
 PALETTE = ("#374151", "#4ade80", "#22c55e", "#a3e635", "#facc15")
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+PRICE_PROFILE = {
+    "model": "gpt-5.5",
+    "context": "short",
+    "input_per_million": 5.00,
+    "cached_input_per_million": 0.50,
+    "output_per_million": 30.00,
+}
+COLOR_MODE = "auto"
 
 
 def parse_timestamp(value: Any) -> datetime | None:
@@ -70,6 +78,32 @@ def format_tokens(value: int) -> str:
     if value >= 1_000:
         return "%.1fK" % (value / 1_000)
     return str(value)
+
+
+def format_cost(value: float) -> str:
+    if value >= 1000:
+        return "$%s" % format(value, ",.2f")
+    if value >= 1:
+        return "$%.2f" % value
+    return "$%.4f" % value
+
+
+def billable_input_tokens(usage: dict[str, Any]) -> int:
+    return max(0, int(usage.get("input_tokens") or 0) - int(usage.get("cached_input_tokens") or 0))
+
+
+def pct(value: int, total: int) -> str:
+    if total <= 0:
+        return "0.0%"
+    return "%.1f%%" % (100.0 * value / total)
+
+
+def estimate_usage_cost(usage: dict[str, Any]) -> float:
+    return (
+        billable_input_tokens(usage) * PRICE_PROFILE["input_per_million"]
+        + int(usage.get("cached_input_tokens") or 0) * PRICE_PROFILE["cached_input_per_million"]
+        + int(usage.get("output_tokens") or 0) * PRICE_PROFILE["output_per_million"]
+    ) / 1_000_000.0
 
 
 def iter_session_files(root: Path) -> list[Path]:
@@ -140,6 +174,59 @@ def aggregate(events: list[tuple[date, dict[str, int]]], start: date, end: date)
     return rows
 
 
+def summarize(rows: list[dict[str, Any]]) -> dict[str, int]:
+    totals = empty_usage()
+    for row in rows:
+        add_usage(totals, row)
+    return totals
+
+
+def overview_items(rows: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
+    totals = summarize(rows)
+    return [
+        (
+            "Cost",
+            format_cost(estimate_usage_cost(totals)),
+            "%s/%s\nestimate" % (PRICE_PROFILE["model"], PRICE_PROFILE["context"]),
+        ),
+        (
+            "Input",
+            format_tokens(totals["input_tokens"]),
+            "%s\nbillable" % format_tokens(billable_input_tokens(totals)),
+        ),
+        (
+            "Output",
+            format_tokens(totals["output_tokens"]),
+            "%s\nreasoning" % format_tokens(totals["reasoning_output_tokens"]),
+        ),
+        (
+            "Cache",
+            format_tokens(totals["cached_input_tokens"]),
+            "%s of input" % pct(totals["cached_input_tokens"], totals["input_tokens"]),
+        ),
+    ]
+
+
+def overview_lines(rows: list[dict[str, Any]]) -> list[str]:
+    items = overview_items(rows)
+    widths = [max(len(label), len(value), *(len(part) for part in detail.split("\n"))) for label, value, detail in items]
+    lines = []
+    for row_index in range(4):
+        cells = []
+        for width, (label, value, detail) in zip(widths, items):
+            detail_parts = detail.split("\n")
+            if row_index == 0:
+                cell = dim(label.ljust(width))
+            elif row_index == 1:
+                cell = color(value.ljust(width), PALETTE[-1], bold=True)
+            else:
+                detail_index = row_index - 2
+                cell = dim((detail_parts[detail_index] if detail_index < len(detail_parts) else "").ljust(width))
+            cells.append(cell)
+        lines.append("  " + "  ".join(cells))
+    return lines
+
+
 def quantile(values: list[int], fraction: float) -> int:
     if not values:
         return 0
@@ -194,6 +281,10 @@ def build_weeks(rows: list[dict[str, Any]]) -> tuple[list[str], list[list[dict[s
 
 
 def use_color() -> bool:
+    if COLOR_MODE == "always":
+        return True
+    if COLOR_MODE == "never":
+        return False
     return os.environ.get("NO_COLOR") is None and os.environ.get("TERM") != "dumb"
 
 
@@ -221,10 +312,10 @@ def pad_visible(text: str, width: int) -> str:
     return text + " " * max(0, width - visible_len(text))
 
 
-def panel(lines: list[str], title: str) -> str:
-    width = max(visible_len(line) for line in lines)
+def panel(lines: list[str], title: str, width: int | None = None) -> str:
+    content_width = max(visible_len(line) for line in lines)
     title_text = f" {title} "
-    width = max(width, len(title_text) + 2)
+    width = max(width or 0, content_width, len(title_text) + 2)
     top_left = "╭"
     top_right = "╮"
     bottom_left = "╰"
@@ -233,8 +324,17 @@ def panel(lines: list[str], title: str) -> str:
     top_gap = max(0, width - len(title_text))
     top = top_left + horizontal * (top_gap // 2) + title_text + horizontal * (top_gap - top_gap // 2) + top_right
     bottom = bottom_left + horizontal * width + bottom_right
-    body = ["│" + pad_visible(line, width) + "│" for line in lines]
-    return "\n".join([color(top, PALETTE[-1], bold=True), *body, color(bottom, PALETTE[-1], bold=True)])
+    body = [color("│", PALETTE[-1]) + pad_visible(line, width) + color("│", PALETTE[-1]) for line in lines]
+    return "\n".join([color(top, PALETTE[-1]), *body, color(bottom, PALETTE[-1])])
+
+
+def choose_density(week_count: int, terminal_width: int) -> str:
+    comfortable_width = 12 + week_count * 3
+    return "comfortable" if comfortable_width <= max(50, terminal_width - 4) else "compact"
+
+
+def activity_stride(density: str) -> int:
+    return 3 if density == "comfortable" else 1
 
 
 def render_band(
@@ -279,7 +379,8 @@ def render_activity(rows: list[dict[str, Any]], start: date, end: date) -> str:
     levels = thresholds(rows)
     total = sum(int(row["total_tokens"]) for row in rows)
     terminal_width = shutil.get_terminal_size((100, 24)).columns
-    stride = 3 if 12 + len(weeks) * 3 <= max(50, terminal_width - 4) else 1
+    density = choose_density(len(weeks), terminal_width)
+    stride = activity_stride(density)
     inner_budget = max(42, terminal_width - 4)
     weeks_per_band = max(4, (inner_budget - 9) // stride)
 
@@ -288,7 +389,9 @@ def render_activity(rows: list[dict[str, Any]], start: date, end: date) -> str:
         end_index = min(len(weeks), start_index + weeks_per_band)
         lines = [
             "",
-            f"  {dim(start.isoformat() + ' to ' + end.isoformat())}  "
+            *overview_lines(rows),
+            "",
+            "  " + dim(start.isoformat() + " to " + end.isoformat() + "  ")
             + color("total=%s" % format_tokens(total), PALETTE[-1], bold=True),
             "",
             *render_band(labels, weeks, levels, stride, start_index, end_index),
@@ -299,13 +402,14 @@ def render_activity(rows: list[dict[str, Any]], start: date, end: date) -> str:
         for level, glyph in enumerate(glyphs):
             legend += color(glyph, PALETTE[level], bold=level > 0) + " "
         legend += dim("More")
-        footer = "     " + dim("Asia/Shanghai / token_count event day")
+        footer = "     " + dim("bright / %s / total_tokens" % density)
         if len(weeks) > weeks_per_band:
             band_start = weeks[start_index][0] or next(day for day in weeks[start_index] if day)
             band_end = weeks[end_index - 1][-1] or next(day for day in reversed(weeks[end_index - 1]) if day)
             footer += dim(" / %s..%s" % (band_start["date"].isoformat(), band_end["date"].isoformat()))
         lines.extend([legend, footer, ""])
-        blocks.append(panel(lines, "Codex Usage Activity"))
+        width = max(visible_len(line) for line in lines)
+        blocks.append(panel(lines, "Total tokens Activity", width))
     return "\n\n".join(blocks)
 
 
@@ -314,6 +418,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Show a Codex usage activity graph. Optional argument: days."
     )
     parser.add_argument("days", nargs="?", type=int, help="Days ending today; omit to start at the earliest usage record.")
+    parser.add_argument(
+        "--color",
+        choices=("auto", "always", "never"),
+        default="auto",
+        help="Color output mode. Default: auto.",
+    )
     args = parser.parse_args(argv)
     if args.days is not None and args.days <= 0:
         parser.error("days must be a positive integer")
@@ -321,7 +431,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global COLOR_MODE
     args = parse_args(argv)
+    COLOR_MODE = args.color
     events = load_events()
     if not events:
         print("No Codex token usage found in %s." % SESSIONS_DIR)
