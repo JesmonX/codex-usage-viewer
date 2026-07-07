@@ -1,0 +1,22 @@
+{
+  "name": "codex-usage-viewer",
+  "version": "0.1.0",
+  "description": "Terminal activity heatmap for local Codex token usage.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Usage Viewer",
+    "shortDescription": "Show local Codex usage as a heatmap.",
+    "longDescription": "Render a contribution-style terminal activity graph from local Codex token_count events in ~/.codex/sessions.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": ["Read", "Visualization"],
+    "brandColor": "#22C55E",
+    "defaultPrompt": [
+      "Use $codex-usage-viewer to show my Codex usage activity.",
+      "Use $codex-usage-viewer days=30 for recent usage."
+    ]
+  }
+}
