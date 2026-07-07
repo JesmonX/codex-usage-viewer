@@ -1,9 +1,11 @@
 # Codex Usage Viewer
-To view Codex Usage for Non-Subscribers(such as router users).
+To view Codex Usage for **Non-Subscribers**(such as router users).
+
 Codex Usage Viewer is a lightweight local Codex plugin that renders a terminal activity heatmap from `~/.codex/sessions` token usage logs.
 
 ## Installation
 Prompt codex to install this.
+
 Such as `install JesmonX/codex-usage-viewer`.
 
 ## Usage
