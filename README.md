@@ -35,5 +35,3 @@ Passing a positive integer shows that many recent days.
 
 - Reads only local `token_count` events from `~/.codex/sessions`.
 - Groups dates by token-count event timestamp in `Asia/Shanghai`.
-- Does not export message content.
-- `/usagevis` is included as a skill trigger phrase, but native custom slash command registration depends on Codex client support.
