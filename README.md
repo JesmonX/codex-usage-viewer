@@ -22,7 +22,8 @@ Use $codex-usage-viewer days=30
 
 It shows a terminal usage panel:
 
-<img width="648" height="475" alt="image" src="https://github.com/user-attachments/assets/1383accd-e019-4699-9be3-18ab1742301c" />
+<img width="1310" height="580" alt="image" src="https://github.com/user-attachments/assets/c92e38db-3491-4c8f-8029-eb342582efcb" />
+
 
 The bundled script accepts one optional days argument plus an optional color mode:
 
@@ -46,6 +47,3 @@ intentionally does not render a terminal bars chart.
 
 - Reads only local `token_count` events from `~/.codex/sessions`.
 - Groups dates by token-count event timestamp in `Asia/Shanghai`.
-- Does not export message content.
-- `/usagevis` is included as a skill trigger phrase, but native custom slash
-  command registration depends on Codex client support.
