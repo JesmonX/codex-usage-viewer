@@ -15,7 +15,7 @@ Run the bundled script to show a local Codex usage overview and activity graph.
 2. Run:
 
 ```bash
-python3 <this-skill>/scripts/usagevis.py --color always [days]
+python3 <this-skill>/scripts/usagevis.py --color never [days]
 ```
 
 3. Return the overview and activity graph output directly as raw terminal output. Do not wrap it in a Markdown code block, and do not add bars, Top Days, Top Working Directories, CSV, JSON, or HTML reports.
@@ -24,7 +24,8 @@ python3 <this-skill>/scripts/usagevis.py --color always [days]
 
 - The script reads only local `token_count` events from `~/.codex/sessions`.
 - Dates are grouped by each `token_count` event timestamp in `Asia/Shanghai`.
-- The overview shows estimated cost, input, output, and cached input using the bundled default price profile.
-- `--color always` is used so Codex plugin output can preserve ANSI color even when `NO_COLOR` is set in the execution environment.
+- The overview shows estimated cost, input, output, and cached input; the detail row only keeps the model name and cache hit rate.
+- `--color never` is used so Codex can display the graph faster without replaying many ANSI escape sequences.
+- The plain heatmap uses four visible block-glyph intensity levels without dot markers.
 - Message content is not exported or displayed.
 - `/usagevis` is treated as a trigger phrase for this skill. If the active Codex client intercepts unknown slash commands before they reach the model, use `usagevis` or `Use $codex-usage-viewer` instead.

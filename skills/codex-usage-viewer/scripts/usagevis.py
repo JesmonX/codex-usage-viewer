@@ -27,9 +27,10 @@ TOKEN_KEYS = (
 LOCAL_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 SESSIONS_DIR = Path("~/.codex/sessions").expanduser()
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-GLYPHS_WIDE = ("··", "░░", "▒▒", "▓▓", "██")
-GLYPHS_NARROW = ("·", "░", "▒", "▓", "█")
+GLYPHS_WIDE = ("  ", "░░", "▒▒", "▓▓", "██")
+GLYPHS_NARROW = (" ", "░", "▒", "▓", "█")
 PALETTE = ("#374151", "#4ade80", "#22c55e", "#a3e635", "#facc15")
+ACTIVE_LEVEL_COUNT = len(GLYPHS_NARROW) - 1
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 PRICE_PROFILE = {
     "model": "gpt-5.5",
@@ -187,22 +188,22 @@ def overview_items(rows: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
         (
             "Cost",
             format_cost(estimate_usage_cost(totals)),
-            "%s/%s\nestimate" % (PRICE_PROFILE["model"], PRICE_PROFILE["context"]),
+            PRICE_PROFILE["model"],
         ),
         (
             "Input",
             format_tokens(totals["input_tokens"]),
-            "%s\nbillable" % format_tokens(billable_input_tokens(totals)),
+            "",
         ),
         (
             "Output",
             format_tokens(totals["output_tokens"]),
-            "%s\nreasoning" % format_tokens(totals["reasoning_output_tokens"]),
+            "",
         ),
         (
             "Cache",
             format_tokens(totals["cached_input_tokens"]),
-            "%s of input" % pct(totals["cached_input_tokens"], totals["input_tokens"]),
+            pct(totals["cached_input_tokens"], totals["input_tokens"]),
         ),
     ]
 
@@ -211,7 +212,8 @@ def overview_lines(rows: list[dict[str, Any]]) -> list[str]:
     items = overview_items(rows)
     widths = [max(len(label), len(value), *(len(part) for part in detail.split("\n"))) for label, value, detail in items]
     lines = []
-    for row_index in range(4):
+    max_detail_rows = max((len(detail.split("\n")) for _, _, detail in items if detail), default=0)
+    for row_index in range(2 + max_detail_rows):
         cells = []
         for width, (label, value, detail) in zip(widths, items):
             detail_parts = detail.split("\n")
@@ -238,7 +240,8 @@ def thresholds(rows: list[dict[str, Any]]) -> list[int]:
     values = sorted(int(row["total_tokens"]) for row in rows if int(row["total_tokens"]) > 0)
     if not values:
         return []
-    return [quantile(values, fraction) for fraction in (0.25, 0.50, 0.75, 0.90)]
+    fractions = [level / ACTIVE_LEVEL_COUNT for level in range(1, ACTIVE_LEVEL_COUNT)]
+    return [quantile(values, fraction) for fraction in fractions]
 
 
 def activity_level(value: int, levels: list[int]) -> int:
@@ -248,7 +251,7 @@ def activity_level(value: int, levels: list[int]) -> int:
     for threshold in levels:
         if value > threshold:
             level += 1
-    return min(level, 4)
+    return min(level, ACTIVE_LEVEL_COUNT)
 
 
 def build_weeks(rows: list[dict[str, Any]]) -> tuple[list[str], list[list[dict[str, Any] | None]]]:
@@ -399,10 +402,11 @@ def render_activity(rows: list[dict[str, Any]], start: date, end: date) -> str:
         ]
         legend = "     " + dim("Less ")
         glyphs = GLYPHS_WIDE if stride > 1 else GLYPHS_NARROW
-        for level, glyph in enumerate(glyphs):
+        for level, glyph in enumerate(glyphs[1:], start=1):
             legend += color(glyph, PALETTE[level], bold=level > 0) + " "
         legend += dim("More")
-        footer = "     " + dim("bright / %s / total_tokens" % density)
+        style = "bright" if use_color() else "plain-4"
+        footer = "     " + dim("%s / %s / total_tokens" % (style, density))
         if len(weeks) > weeks_per_band:
             band_start = weeks[start_index][0] or next(day for day in weeks[start_index] if day)
             band_end = weeks[end_index - 1][-1] or next(day for day in reversed(weeks[end_index - 1]) if day)

@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-viewer",
-  "version": "0.1.0+codex.20260707135140",
+  "version": "0.1.0+codex.20260708050936",
   "description": "Terminal usage overview and heatmap for local Codex token usage.",
   "author": {
     "name": "Local developer"
